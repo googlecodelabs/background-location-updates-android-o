@@ -23,9 +23,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
 import android.location.Location;
-import android.os.Build;
 import android.preference.PreferenceManager;
-import android.support.annotation.RequiresApi;
 import android.support.v4.app.TaskStackBuilder;
 import android.app.NotificationChannel;
 
@@ -48,7 +46,6 @@ class LocationResultHelper {
     private List<Location> mLocations;
     private NotificationManager mNotificationManager;
 
-    @RequiresApi(api = Build.VERSION_CODES.O)
     LocationResultHelper(Context context, List<Location> locations) {
         mContext = context;
         mLocations = locations;
