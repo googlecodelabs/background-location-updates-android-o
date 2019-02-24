@@ -15,28 +15,25 @@
  */
 package com.google.android.gms.location.sample.backgroundlocationupdates;
 
+import android.Manifest;
 import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.net.Uri;
+import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.provider.Settings;
 import android.support.annotation.NonNull;
-import android.support.annotation.Nullable;
+import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
 import android.support.v4.app.FragmentActivity;
-import android.support.v7.app.AppCompatActivity;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
-import android.support.design.widget.Snackbar;
-import android.Manifest;
 import android.widget.Button;
 import android.widget.TextView;
 
-import com.google.android.gms.common.ConnectionResult;
-import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.location.FusedLocationProviderClient;
 import com.google.android.gms.location.LocationRequest;
 import com.google.android.gms.location.LocationServices;
 
@@ -50,9 +47,7 @@ import com.google.android.gms.location.LocationServices;
  * updates less frequently than the interval specified in the {@link LocationRequest} when the app
  * is no longer in the foreground.
  */
-public class MainActivity extends FragmentActivity implements GoogleApiClient.ConnectionCallbacks,
-        GoogleApiClient.OnConnectionFailedListener,
-        SharedPreferences.OnSharedPreferenceChangeListener {
+public class MainActivity extends FragmentActivity implements SharedPreferences.OnSharedPreferenceChangeListener {
 
     private static final String TAG = MainActivity.class.getSimpleName();
     private static final int REQUEST_PERMISSIONS_REQUEST_CODE = 34;
@@ -76,14 +71,14 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
     private static final long MAX_WAIT_TIME = UPDATE_INTERVAL * 3;
 
     /**
+     * The main entry point for interacting with the fused location provider.
+     */
+    private FusedLocationProviderClient mFusedLocationClient;
+
+    /**
      * Stores parameters for requests to the FusedLocationProviderApi.
      */
     private LocationRequest mLocationRequest;
-
-    /**
-     * The entry point to Google Play Services.
-     */
-    private GoogleApiClient mGoogleApiClient;
 
     // UI Widgets.
     private Button mRequestUpdatesButton;
@@ -99,12 +94,14 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
         mRemoveUpdatesButton = (Button) findViewById(R.id.remove_updates_button);
         mLocationUpdatesResultView = (TextView) findViewById(R.id.location_updates_result);
 
+        //create an instance of the Fused Location Provider Client
+        mFusedLocationClient = LocationServices.getFusedLocationProviderClient(this);
+
         // Check if the user revoked runtime permissions.
         if (!checkPermissions()) {
             requestPermissions();
-        }
-
-        buildGoogleApiClient();
+        } else
+            createLocationRequest();
     }
 
     @Override
@@ -146,46 +143,8 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
 
     }
 
-    /**
-     * Builds {@link GoogleApiClient}, enabling automatic lifecycle management using
-     * {@link GoogleApiClient.Builder#enableAutoManage(android.support.v4.app.FragmentActivity,
-     * int, GoogleApiClient.OnConnectionFailedListener)}. I.e., GoogleApiClient connects in
-     * {@link AppCompatActivity#onStart}, or if onStart() has already happened, it connects
-     * immediately, and disconnects automatically in {@link AppCompatActivity#onStop}.
-     */
-    private void buildGoogleApiClient() {
-        if (mGoogleApiClient != null) {
-            return;
-        }
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addConnectionCallbacks(this)
-                .enableAutoManage(this, this)
-                .addApi(LocationServices.API)
-                .build();
-        createLocationRequest();
-    }
-
-    @Override
-    public void onConnected(@Nullable Bundle bundle) {
-        Log.i(TAG, "GoogleApiClient connected");
-    }
-
     private PendingIntent getPendingIntent() {
         return null;
-    }
-
-    @Override
-    public void onConnectionSuspended(int i) {
-        final String text = "Connection suspended";
-        Log.w(TAG, text + ": Error code: " + i);
-        showSnackbar("Connection suspended");
-    }
-
-    @Override
-    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
-        final String text = "Exception while connecting to Google Play services";
-        Log.w(TAG, text + ": " + connectionResult.getErrorMessage());
-        showSnackbar(text);
     }
 
     /**
@@ -256,9 +215,8 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
                 // receive empty arrays.
                 Log.i(TAG, "User interaction was cancelled.");
             } else if (grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                // Permission was granted. Kick off the process of building and connecting
-                // GoogleApiClient.
-                buildGoogleApiClient();
+                // Permission was granted. Kick off the process of building and connecting to Location Request
+                createLocationRequest();
             } else {
                 // Permission denied.
 
@@ -310,8 +268,7 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
         try {
             Log.i(TAG, "Starting location updates");
             LocationRequestHelper.setRequesting(this, true);
-            LocationServices.FusedLocationApi.requestLocationUpdates(
-                    mGoogleApiClient, mLocationRequest, getPendingIntent());
+            mFusedLocationClient.requestLocationUpdates(mLocationRequest, getPendingIntent());
         } catch (SecurityException e) {
            LocationRequestHelper.setRequesting(this, false);
             e.printStackTrace();
@@ -324,8 +281,7 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
     public void removeLocationUpdates(View view) {
         Log.i(TAG, "Removing location updates");
         LocationRequestHelper.setRequesting(this, false);
-        LocationServices.FusedLocationApi.removeLocationUpdates(mGoogleApiClient,
-                getPendingIntent());
+        mFusedLocationClient.removeLocationUpdates(getPendingIntent());
     }
 
     /**
